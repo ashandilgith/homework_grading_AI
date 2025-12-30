@@ -1,0 +1,5 @@
+# Ignore temp files
+*.pdf
+*.jpg
+*.png
+temp_*
