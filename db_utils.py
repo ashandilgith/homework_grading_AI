@@ -7,7 +7,6 @@ import pg8000
 pool = None
 
 def init_connection_pool():
-    """Initializes the connection pool (The Engine)."""
     global pool
     if pool is None:
         instance_connection_name = os.environ["INSTANCE_CONNECTION_NAME"]
@@ -24,11 +23,10 @@ def init_connection_pool():
                 user=db_user,
                 password=db_pass,
                 db=db_name,
-                ip_type=IPTypes.PUBLIC  # Crucial for Codespaces
+                ip_type=IPTypes.PUBLIC
             )
             return conn
 
-        # Create the SQLAlchemy engine
         pool = sqlalchemy.create_engine(
             "postgresql+pg8000://",
             creator=getconn,
@@ -36,43 +34,46 @@ def init_connection_pool():
     return pool
 
 def get_db_connection():
-    """
-    REQUIRED FUNCTION: Returns a raw connection for Pandas to use.
-    This fixes the 'AttributeError' you were seeing.
-    """
     if pool is None:
         init_connection_pool()
     return pool.connect()
 
-def save_grade(tutor_name, filename, score, feedback, file_url):
-    """Saves the grading result to Cloud SQL."""
+# --- UPDATED FUNCTION ---
+def save_grade(tutor_name, filename, score, feedback, file_url, tokens_used=0):
+    """Saves the grading result AND the token usage."""
     if pool is None:
         init_connection_pool()
     
     with pool.connect() as db_conn:
-        # Create table if it doesn't exist
-        db_conn.execute(sqlalchemy.text(
-            """CREATE TABLE IF NOT EXISTS grading_logs (
-                id SERIAL PRIMARY KEY,
-                username VARCHAR(50),
-                filename VARCHAR(255),
-                score INT,
-                feedback TEXT,
-                file_url TEXT,
-                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );"""
-        ))
-        db_conn.commit()
-
-        # Insert data
+        # We assume the table already exists (created by reset_db.py)
+        
+        # Insert data with Tokens
         stmt = sqlalchemy.text(
-            "INSERT INTO grading_logs (username, filename, score, feedback, file_url) VALUES (:u, :f, :s, :fb, :url)"
+            """INSERT INTO grading_logs 
+               (username, filename, score, feedback, file_url, tokens_used) 
+               VALUES (:u, :f, :s, :fb, :url, :tok)"""
         )
         db_conn.execute(stmt, parameters={
             "u": tutor_name, 
             "f": filename, 
             "s": score, 
             "fb": feedback, 
-            "url": file_url
+            "url": file_url,
+            "tok": tokens_used
         })
         db_conn.commit()
+
+def get_tutor_usage(username):
+    """Returns the total tokens used by a specific tutor."""
+    if pool is None:
+        init_connection_pool()
+        
+    with pool.connect() as db_conn:
+        # Sum the 'tokens_used' column for this user
+        result = db_conn.execute(sqlalchemy.text(
+            "SELECT SUM(tokens_used) FROM grading_logs WHERE username = :u"
+        ), {"u": username}).fetchone()
+        
+        # If they haven't graded anything yet, result is None -> return 0
+        total_used = result[0] if result and result[0] else 0
+        return int(total_used)
