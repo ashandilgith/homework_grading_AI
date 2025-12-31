@@ -1,28 +1,25 @@
 from google.cloud import storage
 import os
 
-# Try to get bucket name from environment, else use a placeholder for testing
-BUCKET_NAME = os.environ.get("BUCKET_NAME", "iskole-dev-bucket")
+def upload_file(source_file, destination_blob_name):
+    """
+    Uploads a file object to the Google Cloud Storage Bucket.
+    """
+    # 1. Get Config from .env
+    project_id = os.environ.get("GOOGLE_CLOUD_PROJECT")
+    bucket_name = os.environ["BUCKET_NAME"]
+    
+    # 2. Connect to the Client with EXPLICIT Project ID
+    # This fixes the "Project was not passed" error
+    storage_client = storage.Client(project=project_id)
+    
+    bucket = storage_client.bucket(bucket_name)
+    blob = bucket.blob(destination_blob_name)
 
-def upload_to_gcs(file_obj, username):
-    """
-    Uploads a file directly to Google Cloud Storage.
-    Returns: The secure 'gs://' path or a signed URL.
-    """
-    try:
-        # Auto-authenticates using the Service Account in Cloud Run
-        client = storage.Client()
-        bucket = client.bucket(BUCKET_NAME)
-        
-        # Naming convention: username/filename to prevent collisions
-        blob_name = f"{username}/{file_obj.name}"
-        blob = bucket.blob(blob_name)
-        
-        # Reset file pointer to start
-        file_obj.seek(0)
-        blob.upload_from_file(file_obj, content_type=file_obj.type)
-        
-        return f"gs://{BUCKET_NAME}/{blob_name}"
-    except Exception as e:
-        print(f"Storage Error: {e}")
-        return None
+    # 3. Ensure we are reading from the start of the file
+    source_file.seek(0)
+    
+    # 4. Upload
+    blob.upload_from_file(source_file)
+
+    return blob.public_url
