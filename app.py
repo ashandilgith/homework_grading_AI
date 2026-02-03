@@ -9,40 +9,40 @@ import db_utils
 import storage_utils
 import grader_engine
 
-st.set_page_config(page_title="Iskole 🏫", layout="wide")
+st.set_page_config(page_title="Eskwela", layout="wide")
 
 # --- CUSTOM CSS ---
 st.markdown("""
 <style>
-    .stApp {background-color: #0e1117;}
+    .stApp {background-color: #12002F;}
     .stTabs [data-baseweb="tab-list"] {
-        gap: 24px; background-color: transparent; padding-bottom: 10px; border-bottom: 1px solid #262730;
+        gap: 24px; background-color: transparent; padding-bottom: 10px; border-bottom: 3px solid #38BDF8;
     }
     .stTabs [data-baseweb="tab"] {
         height: auto; white-space: pre-wrap; background-color: transparent !important;
-        border-radius: 0px; border: none; color: #808495; font-size: 16px; font-weight: 600; padding: 10px 0px;
+        border-radius: 0px; border: none; color: #FCA5A5; font-size: 16px; font-weight: 600; padding: 10px 0px;
     }
     .stTabs [aria-selected="true"] {
-        background-color: transparent !important; color: #FFFFFF !important; border-bottom: 2px solid #FF4B4B;
+        background-color: transparent !important; color: #FFFFFF !important; border-bottom: 4px solid #FDE047;
     }
     .stTabs [data-baseweb="tab"]:hover {color: #FFFFFF;}
     .stProgress > div > div > div > div {
-        background-color: #00CC96;
+        background-color: #22C55E;
     }
-    /* Style for the How-To Box */
     .howto-box {
-        background-color: #1c2026;
+        background-color: #1F1147;
         padding: 15px;
-        border-radius: 8px;
-        border-left: 4px solid #FF4B4B;
+        border-radius: 10px;
+        border-left: 6px solid #FDE047;
         margin-bottom: 20px;
-        color: #d1d5db;
+        color: #E9D5FF;
         font-size: 14px;
     }
 </style>
+
 """, unsafe_allow_html=True)
 
-st.title("Iskole AI")
+st.title("Eskwela AI")
 st.subheader("Automated Homework Grading Assistant")
 
 # --- HOW TO USE GUIDE (NEW) ---
@@ -51,10 +51,10 @@ st.markdown("""
     <b> How to Use:</b><br>
     1. <b>Login:</b> Enter your Username in the configuration panel<br>
     2. <b>Upload:</b> Upload your Marking Scheme (PDF) and either single or multiple Student Answer Papers (PDF).<br>
-    3. <b>Configure:</b> Set "Total Marks" (leave <b>0</b> to auto-detect) - click upload Custom Template.<br>
+    3. <b>Configure:</b> Set "Total Marks" (leave <b>0</b> to auto-detect from marking scheme) <br>
     4. <b>Upload</b> Click upload Custom Template, if you need to upload a custom report template (not essential) <br>
-    5. <b>Run:</b> Click "Run Batch Grading" to process files and download your PDF reports.
-    6. <b>Run:</b> Contact us if you need more tokens, for affordable upgrades 
+    5. <b>Run:</b> Click "Run Batch Grading" to process files and download your PDF reports.<br>
+    6. <b>Limits:</b> Contact us if you need more tokens, for affordable upgrades 
 </div>
 </div>
 """, unsafe_allow_html=True)
@@ -79,7 +79,7 @@ class AestheticReport(FPDF):
         self.set_y(10)
         self.set_font('Arial', 'B', 16)
         self.set_text_color(255, 255, 255)
-        self.cell(0, 10, 'Iskole Grading Report', 0, 0, 'C')
+        self.cell(0, 10, 'Eskwela Grading Report', 0, 0, 'C')
         self.ln(25)
 
     def footer(self):
@@ -193,8 +193,7 @@ with tab1:
         uploaded_scheme = st.file_uploader("1. Marking Scheme (PDF)", type=["pdf"])
         
         st.write("**Exam Settings:**")
-        max_score_input = st.number_input("Total Marks (0 = Auto-detect)", min_value=0, value=120)
-
+        max_score_input = st.number_input("Total Marks (0 = Auto-detect)", min_value=0, value=0)
         st.markdown("---")
         use_custom = st.checkbox("Use Custom Template?")
         uploaded_template = None
