@@ -1,10 +1,11 @@
-import streamlit as st
+#this file works only minor issue with colors
+ streamlit as st
 import os
 import pandas as pd
 from fpdf import FPDF
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv()import
 import db_utils
 import storage_utils
 import grader_engine
@@ -14,51 +15,32 @@ st.set_page_config(page_title="Eskwela", layout="wide")
 # --- CUSTOM CSS ---
 st.markdown("""
 <style>
-    /* 1. Main Backgrounds */
-    .stApp { background-color: #12002F; color: #FAFAFA; }
-    
-    /* 2. Standard Text & Labels */
-    .stApp p, .stApp label, h1, h2, h3, h4, h5, h6 {
-        color: #FAFAFA !important;
+    .stApp {background-color: #12002F;}
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 24px; background-color: transparent; padding-bottom: 10px; border-bottom: 3px solid #38BDF8;
     }
-
-    /* 3. Tabs */
-    .stTabs [data-baseweb="tab-list"] { gap: 24px; background-color: transparent; padding-bottom: 10px; border-bottom: 3px solid #38BDF8; }
-    .stTabs [data-baseweb="tab"] { height: auto; white-space: pre-wrap; background-color: transparent !important; border-radius: 0px; border: none; color: #FCA5A5; font-size: 16px; font-weight: 600; padding: 10px 0px; }
-    .stTabs [aria-selected="true"] { background-color: transparent !important; color: #FFFFFF !important; border-bottom: 4px solid #FDE047; }
-    .stTabs [data-baseweb="tab"]:hover { color: #FFFFFF; }
-
-    /* 4. Custom Elements */
-    .stProgress > div > div > div > div { background-color: #22C55E; }
-    .howto-box { background-color: #1F1147; padding: 15px; border-radius: 10px; border-left: 6px solid #FDE047; margin-bottom: 20px; color: #E9D5FF !important; font-size: 14px; }
-
-    /* 5. THE FIX: Force Dark Backgrounds on ALL inputs & uploaders */
-    div[data-baseweb="input"], 
-    div[data-baseweb="base-input"],
-    [data-testid="stFileUploadDropzone"] {
-        background-color: #1F1147 !important;
-        border: 1px solid #38BDF8 !important;
-        border-radius: 8px !important;
+    .stTabs [data-baseweb="tab"] {
+        height: auto; white-space: pre-wrap; background-color: transparent !important;
+        border-radius: 0px; border: none; color: #FCA5A5; font-size: 16px; font-weight: 600; padding: 10px 0px;
     }
-
-    /* 6. THE FIX: Make text INSIDE inputs & uploaders white */
-    input, 
-    [data-testid="stFileUploadDropzone"] div,
-    [data-testid="stFileUploadDropzone"] span, 
-    [data-testid="stFileUploadDropzone"] small,
-    [data-testid="stFileUploadDropzone"] p {
-        color: #FAFAFA !important;
+    .stTabs [aria-selected="true"] {
+        background-color: transparent !important; color: #FFFFFF !important; border-bottom: 4px solid #FDE047;
     }
-
-    /* 7. THE FIX: Make the 'Browse files' button stand out */
-    [data-testid="stFileUploadDropzone"] button {
-        background-color: #38BDF8 !important;
-        color: #12002F !important;
-        font-weight: bold !important;
-        border: none !important;
-        border-radius: 5px !important;
+    .stTabs [data-baseweb="tab"]:hover {color: #FFFFFF;}
+    .stProgress > div > div > div > div {
+        background-color: #22C55E;
+    }
+    .howto-box {
+        background-color: #1F1147;
+        padding: 15px;
+        border-radius: 10px;
+        border-left: 6px solid #FDE047;
+        margin-bottom: 20px;
+        color: #E9D5FF;
+        font-size: 14px;
     }
 </style>
+
 """, unsafe_allow_html=True)
 
 st.title("Eskwela AI")
@@ -71,9 +53,10 @@ st.markdown("""
     1. <b>Login:</b> Enter your Username in the configuration panel<br>
     2. <b>Upload:</b> Upload your Marking Scheme (PDF) and either single or multiple Student Answer Papers (PDF).<br>
     3. <b>Configure:</b> Set "Total Marks" (leave <b>0</b> to auto-detect from marking scheme) <br>
-    4. <b>Upload:</b> Click upload Custom Template, if you need to upload a custom report template (not essential) <br>
+    4. <b>Upload</b> Click upload Custom Template, if you need to upload a custom report template (not essential) <br>
     5. <b>Run:</b> Click "Run Batch Grading" to process files and download your PDF reports.<br>
     6. <b>Limits:</b> Contact us if you need more tokens, for affordable upgrades 
+</div>
 </div>
 """, unsafe_allow_html=True)
 
