@@ -23,7 +23,7 @@ def upload_to_gemini(path, mime_type="application/pdf"):
     return file
 
 def grade_submission(student_file_path, scheme_file_path, report_template_path=None, max_score_override=0):
-    # 1. MODEL SELECTION: Using the latest Gemini 3 Flash Preview
+    # 1. MODEL SELECTION
     model = genai.GenerativeModel("gemini-3-flash-preview")
 
     # 2. Upload Files
@@ -32,56 +32,98 @@ def grade_submission(student_file_path, scheme_file_path, report_template_path=N
     
     files_to_send = [student_pdf, scheme_pdf]
     
-    # --- HANDLING THE STYLE GUIDE ---
+    # --- STYLE GUIDE ---
     style_instruction = ""
     if report_template_path:
         template_pdf = upload_to_gemini(report_template_path)
         files_to_send.append(template_pdf)
-        style_instruction = "IMPORTANT: Adopt the TONE and STYLE of the provided 'Style Guide' PDF (e.g. be encouraging, strict, or detailed as shown)."
+        style_instruction = "IMPORTANT: Adopt the TONE and STYLE of the provided 'Style Guide' PDF."
 
     # --- DENOMINATOR LOGIC ---
     if int(max_score_override) > 0:
         max_score_instr = f"The total maximum marks for this paper is EXPLICITLY: {max_score_override}. Use this as the denominator."
     else:
-        max_score_instr = "Detect the max marks. If there are optional sections, calculate the max for a single student (don't sum the whole paper)."
+        max_score_instr = "Detect the max marks. If optional questions exist, calculate only what a single student can attempt."
 
-    # 3. The Hybrid Prompt
+    # 3. REVISED PROMPT (CORE FIX)
     prompt = f"""
-    You are an expert academic examiner.
-    
+    You are an expert academic examiner and strict Teaching Assistant.
+
     INPUTS:
     1. Student Submission
     2. Marking Scheme
     3. Style Guide (Optional)
-    
+
     {max_score_instr}
     {style_instruction}
-    
-    TASK:
-    1. Grade strictly against the Marking Scheme.
-    2. Write a detailed feedback report broken down question-by-question.
-    
-    CRITICAL FORMATTING RULE FOR THE REPORT:
-    You MUST break down the grading question by question. Do not write a general summary. For EVERY single question in the marking scheme, the content inside your `rich_markdown_report` string must follow this exact format:
 
-    **Q[Number]: [Short Topic]**
-    Status: [Correct / Incorrect / Partial / UNATTEMPTED]
-    Score: [X] / [Y]
-    Feedback: [1 sentence explaining why marks were awarded or lost]
+    GRADING LOGIC (MANDATORY):
 
-    At the very end of the report, provide the final total as:
-    FINAL TOTAL: [X] / [Y]
-    
-    OUTPUT FORMAT:
-    Return a pure JSON object.
+    Follow these steps EXACTLY:
+
+    1. Identify the student name.
+       - If not found, return "Unknown Student".
+
+    2. Determine the correct total maximum marks:
+       - Use explicit value if given.
+       - Otherwise infer from marking scheme.
+       - If optional questions exist, calculate only what a single student can attempt.
+
+    3. Decompose the paper:
+       - Break into ALL questions and sub-questions (e.g., 1a, 1b, 2c).
+       - DO NOT skip any.
+
+    4. Grade EACH question independently:
+       For every question:
+       - Compare strictly with marking scheme
+       - Assign:
+            score (numeric)
+            max (numeric)
+            status:
+                "CORRECT" = full marks
+                "PARTIAL" = some marks
+                "INCORRECT" = wrong answer
+                "UNATTEMPTED" = no answer
+       - Provide a SHORT justification explaining WHY marks were awarded or lost
+
+    5. Consistency rules:
+       - NEVER award marks without justification
+       - NEVER exceed max marks
+       - Be strict (do not assume correct intent if not shown)
+       - If unclear answer → mark PARTIAL or INCORRECT with explanation
+
+    6. After grading all questions:
+       - Summarize:
+            strengths (i.e. the areas of the subject the student seemed to have mastered in 3 to 5 lines)
+            weaknesses (ie. which questions were unanswered, poorly answered or wrong, and any competency deficiency overlap, relevant observations  in 3 to 5 lines)
+            improvements (actionable)
+
+    OUTPUT FORMAT (STRICT JSON ONLY):
+
     {{
-        "student_name": "Name",
+        "student_name": "string",
         "questions": [
-            {{ "q": "Q1", "score": <float>, "max": <float> }},
-            {{ "q": "Q2", "score": <float>, "max": <float> }}
+            {{
+                "q": "Q1a",
+                "score": number,
+                "max": number,
+                "status": "CORRECT | PARTIAL | INCORRECT | UNATTEMPTED",
+                "reason": "short explanation"
+            }}
         ],
-        "rich_markdown_report": "The formatted text following the CRITICAL FORMATTING RULE goes here. Use \\n for line breaks."
+        "summary": {{
+            "strengths": "string",
+            "weaknesses": "string",
+            "improvements": "string"
+        }},
+        "rich_markdown_report": "# Grading Report\\n..."
     }}
+
+    IMPORTANT:
+    - The "rich_markdown_report" MUST be derived from the structured grading above
+    - DO NOT invent marks outside the scheme
+    - DO NOT skip questions
+    - DO NOT return anything outside JSON
     """
 
     files_to_send.append(prompt)
@@ -89,9 +131,34 @@ def grade_submission(student_file_path, scheme_file_path, report_template_path=N
     # 4. Generate
     response = model.generate_content(files_to_send)
     
-    # 5. Python Math Safety Net + Rich Text Extraction
+    # 5. Parsing + Safety Net
     try:
         text = response.text.strip()
-        if text.startswith("
-http://googleusercontent.com/immersive_entry_chip/0
-http://googleusercontent.com/immersive_entry_chip/1
+        if text.startswith("```json"): text = text[7:]
+        if text.endswith("```"): text = text[:-3]
+        
+        data = json.loads(text.strip())
+        
+        # A. MATH CHECK
+        calculated_score = sum(q['score'] for q in data.get('questions', []))
+        
+        # B. DENOMINATOR CHECK
+        if int(max_score_override) > 0:
+            final_max = int(max_score_override)
+        else:
+            final_max = sum(q['max'] for q in data.get('questions', []))
+
+        # C. FEEDBACK EXTRACTION
+        feedback_report = data.get("rich_markdown_report", "")
+        
+        if not feedback_report:
+            feedback_report = f"# Grading Report\n**Score:** {calculated_score}/{final_max}\n\n## Feedback\n(Detailed feedback missing.)"
+
+        # VERIFIED SCORE HEADER
+        final_output_text = f"**VERIFIED SCORE:** {int(calculated_score)} / {final_max}\n\n" + feedback_report
+
+        return int(calculated_score), final_output_text, response.usage_metadata.total_token_count
+
+    except Exception as e:
+        print(f"JSON Parsing failed: {e}")
+        return 0, response.text, response.usage_metadata.total_token_count
