@@ -68,10 +68,13 @@ def grade_submission(student_file_path, scheme_file_path, report_template_path=N
        - Use explicit value if given.
        - Otherwise infer from marking scheme.
        - If optional questions exist, calculate only what a single student can attempt.
+       - Calculate total maximum based on all mandatory questions (or where optional questions exist, the minimal mandatory) not just on questions attempted.
 
     3. Decompose the paper:
        - Break into ALL questions and sub-questions (e.g., 1a, 1b, 2c).
        - DO NOT skip any.
+       -
+
 
     4. Grade EACH question independently:
        For every question:
@@ -83,7 +86,7 @@ def grade_submission(student_file_path, scheme_file_path, report_template_path=N
                 "CORRECT" = full marks
                 "PARTIAL" = some marks
                 "INCORRECT" = wrong answer
-                "UNATTEMPTED" = no answer
+                "UNATTEMPTED" = no answer - ensure to mark unattempted questions as unattempted with the question number etc.
        - Provide a SHORT justification explaining WHY marks were awarded or lost
 
     5. Consistency rules:
