@@ -59,18 +59,7 @@ def grade_submission(student_file_path, scheme_file_path, report_template_path=N
     
     TASK:
     1. Grade strictly against the Marking Scheme.
-    2. Write a detailed feedback report broken down question-by-question.
-    
-    CRITICAL FORMATTING RULE FOR THE REPORT:
-    You MUST break down the grading question by question. Do not write a general summary. For EVERY single question in the marking scheme, the content inside your `rich_markdown_report` string must follow this exact format:
-
-    **Q[Number]: [Short Topic]**
-    Status: [Correct / Incorrect / Partial / UNATTEMPTED]
-    Score: [X] / [Y]
-    Feedback: [1 sentence explaining why marks were awarded or lost]
-
-    At the very end of the report, provide the final total as:
-    FINAL TOTAL: [X] / [Y]
+    2. Write a detailed, rich feedback report.
     
     OUTPUT FORMAT:
     Return a pure JSON object.
@@ -80,7 +69,7 @@ def grade_submission(student_file_path, scheme_file_path, report_template_path=N
             {{ "q": "Q1", "score": <float>, "max": <float> }},
             {{ "q": "Q2", "score": <float>, "max": <float> }}
         ],
-        "rich_markdown_report": "The formatted text following the CRITICAL FORMATTING RULE goes here. Use \\n for line breaks."
+        "rich_markdown_report": "# Grading Report\\n... (Put the entire human-readable report here, using Bold, Lists, and the requested Tone) ..."
     }}
     """
 
@@ -92,6 +81,31 @@ def grade_submission(student_file_path, scheme_file_path, report_template_path=N
     # 5. Python Math Safety Net + Rich Text Extraction
     try:
         text = response.text.strip()
-        if text.startswith("
-http://googleusercontent.com/immersive_entry_chip/0
-http://googleusercontent.com/immersive_entry_chip/1
+        if text.startswith("```json"): text = text[7:]
+        if text.endswith("```"): text = text[:-3]
+        
+        data = json.loads(text.strip())
+        
+        # A. MATH CHECK (Python does the summing)
+        calculated_score = sum(q['score'] for q in data.get('questions', []))
+        
+        # B. DENOMINATOR CHECK
+        if int(max_score_override) > 0:
+            final_max = int(max_score_override)
+        else:
+            final_max = sum(q['max'] for q in data.get('questions', []))
+
+        # C. FEEDBACK EXTRACTION
+        feedback_report = data.get("rich_markdown_report", "")
+        
+        if not feedback_report:
+            feedback_report = f"# Grading Report\n**Score:** {calculated_score}/{final_max}\n\n## Feedback\n(Detailed feedback was not generated in the correct format.)"
+
+        # Inject the VERIFIED SCORE header
+        final_output_text = f"**VERIFIED SCORE:** {int(calculated_score)} / {final_max}\n\n" + feedback_report
+
+        return int(calculated_score), final_output_text, response.usage_metadata.total_token_count
+
+    except Exception as e:
+        print(f"JSON Parsing failed: {e}")
+        return 0, response.text, response.usage_metadata.total_token_count
