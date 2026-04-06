@@ -24,7 +24,7 @@ def upload_to_gemini(path, mime_type="application/pdf"):
 
 def grade_submission(student_file_path, scheme_file_path, report_template_path=None, max_score_override=0):
     # 1. MODEL SELECTION
-    model = genai.GenerativeModel("gemini-3-flash-preview")
+    model = genai.GenerativeModel("gemini-2.5-pro")
 
     # 2. Upload Files
     student_pdf = upload_to_gemini(student_file_path)
@@ -45,7 +45,7 @@ def grade_submission(student_file_path, scheme_file_path, report_template_path=N
     else:
         max_score_instr = "Detect the max marks. If optional questions exist, calculate only what a single student can attempt."
 
-    # 3. REVISED PROMPT (CORE FIX)
+    # 3. REVISED PROMPT
     prompt = f"""
     You are an expert academic examiner and strict Teaching Assistant.
 
@@ -73,8 +73,6 @@ def grade_submission(student_file_path, scheme_file_path, report_template_path=N
     3. Decompose the paper:
        - Break into ALL questions and sub-questions (e.g., 1a, 1b, 2c).
        - DO NOT skip any.
-       -
-
 
     4. Grade EACH question independently:
        For every question:
@@ -86,7 +84,7 @@ def grade_submission(student_file_path, scheme_file_path, report_template_path=N
                 "CORRECT" = full marks
                 "PARTIAL" = some marks
                 "INCORRECT" = wrong answer
-                "UNATTEMPTED" = no answer - ensure to mark unattempted questions as unattempted with the question number etc.
+                "UNATTEMPTED" = no answer - ensure to mark unattempted questions as unattempted.
        - Provide a SHORT justification explaining WHY marks were awarded or lost
 
     5. Consistency rules:
@@ -98,7 +96,7 @@ def grade_submission(student_file_path, scheme_file_path, report_template_path=N
     6. After grading all questions:
        - Summarize:
             strengths (i.e. the areas of the subject the student seemed to have mastered in 3 to 5 lines)
-            weaknesses (ie. which questions were unanswered, poorly answered or wrong, and any competency deficiency overlap, relevant observations  in 3 to 5 lines)
+            weaknesses (ie. which questions were unanswered, poorly answered or wrong, and any competency deficiency overlap, relevant observations in 3 to 5 lines)
             improvements (actionable)
 
     OUTPUT FORMAT (STRICT JSON ONLY):
@@ -118,15 +116,13 @@ def grade_submission(student_file_path, scheme_file_path, report_template_path=N
             "strengths": "string",
             "weaknesses": "string",
             "improvements": "string"
-        }},
-        "rich_markdown_report": "# Grading Report\\n..."
+        }}
     }}
 
     IMPORTANT:
-    - The "rich_markdown_report" MUST be derived from the structured grading above
     - DO NOT invent marks outside the scheme
     - DO NOT skip questions
-    - DO NOT return anything outside JSON
+    - DO NOT return anything outside JSON (No markdown blocks, no text outside the braces).
     """
 
     files_to_send.append(prompt)
@@ -134,29 +130,48 @@ def grade_submission(student_file_path, scheme_file_path, report_template_path=N
     # 4. Generate
     response = model.generate_content(files_to_send)
     
-    # 5. Parsing + Safety Net
+    # 5. Parsing + Python Markdown Compilation
     try:
         text = response.text.strip()
-        if text.startswith("```json"): text = text[7:]
-        if text.endswith("```"): text = text[:-3]
         
-        return 0, response.text, response.usage_metadata.total_token_count
+        # Clean up any accidental markdown code blocks from the AI
+        text = re.sub(r"^```json\n?", "", text)
+        text = re.sub(r"\n?```$", "", text)
+        
         data = json.loads(text.strip())
         
         # A. MATH CHECK
-        calculated_score = sum(q['score'] for q in data.get('questions', []))
+        calculated_score = sum(q.get('score', 0) for q in data.get('questions', []))
         
         # B. DENOMINATOR CHECK
         if int(max_score_override) > 0:
             final_max = int(max_score_override)
         else:
-            final_max = sum(q['max'] for q in data.get('questions', []))
+            final_max = sum(q.get('max', 0) for q in data.get('questions', []))
 
-        # C. FEEDBACK EXTRACTION
-        feedback_report = data.get("rich_markdown_report", "")
+        # C. PYTHON-GENERATED READABLE REPORT
+        student_name = data.get("student_name", "Unknown Student")
         
-        if not feedback_report:
-            feedback_report = f"# Grading Report\n**Score:** {calculated_score}/{final_max}\n\n## Feedback\n(Detailed feedback missing.)"
+        # Build the formatted string line by line
+        report_lines = [
+            f"**Student Name:** {student_name}",
+            "\n### Detailed Question Breakdown"
+        ]
+        
+        for q in data.get("questions", []):
+            report_lines.append(f"\n**Q{q.get('q', '?')}**")
+            report_lines.append(f"Status: {q.get('status', 'N/A')}")
+            report_lines.append(f"Score: {q.get('score', 0)} / {q.get('max', 0)}")
+            report_lines.append(f"Feedback: {q.get('reason', '')}")
+            
+        summary = data.get("summary", {})
+        report_lines.append("\n### Overall Performance Summary")
+        report_lines.append(f"**Strengths:**\n{summary.get('strengths', 'None noted.')}\n")
+        report_lines.append(f"**Weaknesses:**\n{summary.get('weaknesses', 'None noted.')}\n")
+        report_lines.append(f"**Areas for Improvement:**\n{summary.get('improvements', 'None noted.')}")
+        
+        # Join it all together
+        feedback_report = "\n".join(report_lines)
 
         # VERIFIED SCORE HEADER
         final_output_text = f"**VERIFIED SCORE:** {int(calculated_score)} / {final_max}\n\n" + feedback_report
@@ -165,3 +180,5 @@ def grade_submission(student_file_path, scheme_file_path, report_template_path=N
 
     except Exception as e:
         print(f"JSON Parsing failed: {e}")
+        # If it fails, return the raw text so you can see what broke
+        return 0, f"**Formatting Error.** Raw output:\n\n{response.text}", 0
