@@ -140,6 +140,7 @@ def grade_submission(student_file_path, scheme_file_path, report_template_path=N
         if text.startswith("```json"): text = text[7:]
         if text.endswith("```"): text = text[:-3]
         
+        return 0, response.text, response.usage_metadata.total_token_count
         data = json.loads(text.strip())
         
         # A. MATH CHECK
@@ -164,4 +165,3 @@ def grade_submission(student_file_path, scheme_file_path, report_template_path=N
 
     except Exception as e:
         print(f"JSON Parsing failed: {e}")
-        return 0, response.text, response.usage_metadata.total_token_count
