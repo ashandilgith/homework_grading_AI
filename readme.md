@@ -1,4 +1,4 @@
-# 🎓 Eskwela AI | Automated Grading Pipeline
+# Eskwela AI | Automated Grading Pipeline
 
 [Streamlit App](https://eskwela2.streamlit.app/)
 
@@ -32,7 +32,7 @@ For educational institutions and tutors, grading is the most time-consuming bott
 
 ---
 
-## ⚙️ How It Works (The Pipeline)
+## How It Works (The Pipeline)
 
 1. **Upload Phase:** User uploads a Marking Scheme (PDF) and $N$ Student Submissions (PDFs).
 2. **Context Window Assembly:** The files are pushed to Gemini's ephemeral file API alongside a strict, rule-based system prompt instructing the model to act as a rigorous Teaching Assistant.
