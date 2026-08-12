@@ -135,7 +135,12 @@ def grade_submission(student_file_path, scheme_file_path, report_template_path=N
     files_to_send.append(prompt)
     
     # 4. Generate
-    response = model.generate_content(files_to_send)
+    #response = model.generate_content(files_to_send)
+    # 4. Generate (with a 10-minute extended timeout)
+    response = model.generate_content(
+        files_to_send, 
+        request_options={"timeout": 600}
+    )
     
     # 5. Parsing + Python Markdown Compilation
     try:
