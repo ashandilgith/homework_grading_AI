@@ -1,3 +1,4 @@
+#this grader engine is specifically for google cloud. Retired for local version. 
 import google.generativeai as genai
 import os
 import time
@@ -7,13 +8,7 @@ from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
-
-# FIX 1: Safely grab the API key whether it's named GEMINI_ or GOOGLE_ in your .env
-api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
-if not api_key:
-    raise ValueError("API Key missing! Please set GEMINI_API_KEY in your .env file.")
-
-genai.configure(api_key=api_key)
+genai.configure(api_key=os.environ["GOOGLE_API_KEY"])
 
 def upload_to_gemini(path, mime_type="application/pdf"):
     """Uploads the given file to Gemini and waits for processing."""
@@ -30,10 +25,9 @@ def upload_to_gemini(path, mime_type="application/pdf"):
 
 def grade_submission(student_file_path, scheme_file_path, report_template_path=None, max_score_override=0):
     # 1. MODEL SELECTION
-    #model = genai.GenerativeModel("gemini-2.5-pro")
-    model = genai.GenerativeModel("gemini-3.5-flash")
+    model = genai.GenerativeModel("gemini-2.5-pro")
 
-    # 2. Upload Files (Directly to Gemini's free storage, bypassing your locked GCP bucket)
+    # 2. Upload Files
     student_pdf = upload_to_gemini(student_file_path)
     scheme_pdf = upload_to_gemini(scheme_file_path)
     
@@ -85,13 +79,13 @@ def grade_submission(student_file_path, scheme_file_path, report_template_path=N
        For every question:
        - Compare strictly with marking scheme
        - Assign:
-           score (numeric)
-           max (numeric)
-           status:
-               "CORRECT" = full marks
-               "PARTIAL" = some marks
-               "INCORRECT" = wrong answer
-               "UNATTEMPTED" = no answer - ensure to mark unattempted questions as unattempted.
+            score (numeric)
+            max (numeric)
+            status:
+                "CORRECT" = full marks
+                "PARTIAL" = some marks
+                "INCORRECT" = wrong answer
+                "UNATTEMPTED" = no answer - ensure to mark unattempted questions as unattempted.
        - Provide a SHORT justification explaining WHY marks were awarded or lost
 
     5. Consistency rules:
@@ -102,9 +96,9 @@ def grade_submission(student_file_path, scheme_file_path, report_template_path=N
 
     6. After grading all questions:
        - Summarize:
-           strengths (i.e. the areas of the subject the student seemed to have mastered in 3 to 5 lines)
-           weaknesses (ie. which questions were unanswered, poorly answered or wrong, and any competency deficiency overlap, relevant observations in 3 to 5 lines)
-           improvements (actionable)
+            strengths (i.e. the areas of the subject the student seemed to have mastered in 3 to 5 lines)
+            weaknesses (ie. which questions were unanswered, poorly answered or wrong, and any competency deficiency overlap, relevant observations in 3 to 5 lines)
+            improvements (actionable)
 
     OUTPUT FORMAT (STRICT JSON ONLY):
 
@@ -113,8 +107,8 @@ def grade_submission(student_file_path, scheme_file_path, report_template_path=N
         "questions": [
             {{
                 "q": "Q1a",
-                "score": 0,
-                "max": 0,
+                "score": number,
+                "max": number,
                 "status": "CORRECT | PARTIAL | INCORRECT | UNATTEMPTED",
                 "reason": "short explanation"
             }}
@@ -150,8 +144,7 @@ def grade_submission(student_file_path, scheme_file_path, report_template_path=N
         # A. MATH CHECK
         calculated_score = sum(q.get('score', 0) for q in data.get('questions', []))
         
-        # B. DENOMINATOR CHECK 
-        # (Note: Assuming this avoids the double-counting issue previously fixed for parent/child questions)
+        # B. DENOMINATOR CHECK
         if int(max_score_override) > 0:
             final_max = int(max_score_override)
         else:
@@ -160,6 +153,7 @@ def grade_submission(student_file_path, scheme_file_path, report_template_path=N
         # C. PYTHON-GENERATED READABLE REPORT
         student_name = data.get("student_name", "Unknown Student")
         
+        # Build the formatted string line by line
         report_lines = [
             f"**Student Name:** {student_name}",
             "\n### Detailed Question Breakdown"
@@ -177,12 +171,15 @@ def grade_submission(student_file_path, scheme_file_path, report_template_path=N
         report_lines.append(f"**Weaknesses:**\n{summary.get('weaknesses', 'None noted.')}\n")
         report_lines.append(f"**Areas for Improvement:**\n{summary.get('improvements', 'None noted.')}")
         
+        # Join it all together
         feedback_report = "\n".join(report_lines)
 
+        # VERIFIED SCORE HEADER
         final_output_text = f"**VERIFIED SCORE:** {int(calculated_score)} / {final_max}\n\n" + feedback_report
 
         return int(calculated_score), final_output_text, response.usage_metadata.total_token_count
 
     except Exception as e:
         print(f"JSON Parsing failed: {e}")
+        # If it fails, return the raw text so you can see what broke
         return 0, f"**Formatting Error.** Raw output:\n\n{response.text}", 0
